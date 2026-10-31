@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NoteSheet Base — Invert Dark Lecture Slides & Print-Ready PDF Engine</title>
+  <meta name="description" content="Fully customizable base repo for inverting dark lecture and blackboard PDFs to clean white notes, merging files, preserving screenshots, and N-up printing." />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><rect width='256' height='256' rx='60' fill='%23facc15'/><path d='M80 60h96v32H80zm0 48h96v32H80zm0 48h64v32H80z' fill='%2316171b'/></svg>" />
+  <script type="module" crossorigin src="/assets/index-wdc1K9rC.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-3V6r8oAL.css">
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="header-nav">
+    <a href="#" class="brand">
+      <span class="brand-icon">⚡</span>
+      <span>NoteSheet <small style="font-weight:500; font-size:12px; opacity:0.75; border:1px solid var(--border); padding:2px 6px; border-radius:99px;">Base</small></span>
+    </a>
+    <div class="nav-right">
+      <button id="theme-btn" class="theme-toggle-btn" type="button" aria-label="Toggle Dark/Light Mode" title="Toggle Theme">
+        <svg viewBox="0 0 256 256" fill="currentColor" class="icon"><path d="M216.73,149.77A96,96,0,0,1,106.23,39.27a8,8,0,0,0-9.68-9.68A112.06,112.06,0,1,0,226.41,159.45a8,8,0,0,0-9.68-9.68Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+    <!-- Hero / Intro -->
+    <section class="hero">
+      <div class="hero-header">
+        <h1 class="hero-title">Dark slides in. <mark>Print-ready notes</mark> out.</h1>
+        <p class="hero-subtitle">
+          Invert dark lecture &amp; blackboard notes to crisp white paper, merge multiple PDFs, protect diagrams with smart invert, and save massive paper and ink.
+        </p>
+      </div>
+
+      <!-- File Upload Dropzone -->
+      <label id="dropzone" class="dropzone" tabindex="0">
+        <input id="file-input" type="file" accept="application/pdf,.pdf" multiple hidden />
+        <div class="dropzone-icon">
+          <svg viewBox="0 0 256 256" fill="currentColor" class="icon" style="width:28px;height:28px;"><path d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z"/></svg>
+        </div>
+        <div class="dropzone-title">Choose PDFs or drag &amp; drop them here</div>
+        <div class="dropzone-sub">Upload one or several files to merge them. Files process 100% locally in your browser.</div>
+      </label>
+
+      <!-- File List -->
+      <ul id="file-list" class="file-list"></ul>
+      <div id="error-alert" class="alert-error" hidden></div>
+      <div id="busy-alert" style="margin-top:10px; color:var(--text-muted); font-size:13px;" hidden></div>
+    </section>
+
+    <!-- Workspace (Main Settings & Live Preview) -->
+    <section class="workspace" id="workspace">
+      <!-- Left Column: Controls & Configuration -->
+      <div class="ws-column-main">
+        <!-- Page Selection Panel -->
+        <div class="panel" id="panel-pages" hidden>
+          <div class="panel-head">
+            <h2 class="panel-title">Pages <small id="page-summary"></small></h2>
+            <div class="seg-group" role="group" aria-label="Page selection">
+              <button class="seg-btn" id="btn-sel-all" type="button">All</button>
+              <button class="seg-btn" id="btn-sel-none" type="button">None</button>
+              <button class="seg-btn" id="btn-sel-flip" type="button">Flip</button>
+            </div>
+          </div>
+
+          <div class="remove-row">
+            <label for="remove-input">
+              <svg viewBox="0 0 256 256" fill="currentColor" class="icon"><path d="M157.73,113.13A8,8,0,0,1,159.82,102L227.48,55.7a8,8,0,0,1,9,13.21l-67.67,46.3a7.92,7.92,0,0,1-4.51,1.4A8,8,0,0,1,157.73,113.13Zm80.87,85.09a8,8,0,0,1-11.12,2.08L136,137.7,93.49,166.78a36,36,0,1,1-9-13.19L121.83,128,84.44,102.41a35.86,35.86,0,1,1,9-13.19l143,97.87A8,8,0,0,1,238.6,198.22ZM80,180a20,20,0,1,0-5.86,14.14A19.85,19.85,0,0,0,80,180ZM74.14,90.13a20,20,0,1,0-28.28,0A19.85,19.85,0,0,0,74.14,90.13Z"/></svg>
+              <span>Remove pages:</span>
+            </label>
+            <input id="remove-input" type="text" placeholder="e.g. 1, 4-6, 12" />
+            <button id="remove-apply" class="btn btn-ghost" type="button" style="padding:4px 10px; font-size:12px;">Apply</button>
+          </div>
+
+          <div id="page-grid" class="thumb-grid"></div>
+        </div>
+
+        <!-- Color & Enhancement Options -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Color Inversion &amp; Quality Filters</h2>
+          </div>
+          <div class="switches-group">
+            <label class="switch-item">
+              <span class="switch-texts">
+                <b>Invert colors</b>
+                <em>Dark lecture and blackboard slides become clean white paper</em>
+              </span>
+              <input type="checkbox" id="opt-invert" class="switch-toggle" checked />
+            </label>
+
+            <label class="switch-item sub-item">
+              <span class="switch-texts">
+                <b>Pure white background</b>
+                <em>Removes cream/beige tint left by slate, navy, or blackboard green backgrounds</em>
+              </span>
+              <input type="checkbox" id="opt-white" class="switch-toggle" checked />
+            </label>
+
+            <label class="switch-item sub-item">
+              <span class="switch-texts">
+                <b>Smart invert for pasted screenshots</b>
+                <em>Preserves light diagrams and textbook snippets without inverting them</em>
+              </span>
+              <input type="checkbox" id="opt-preserve" class="switch-toggle" checked />
+            </label>
+
+            <label class="switch-item">
+              <span class="switch-texts">
+                <b>Clear background</b>
+                <em>Whitens faint background textures, slide gradients, and scanner noise</em>
+              </span>
+              <input type="checkbox" id="opt-clear" class="switch-toggle" />
+            </label>
+
+            <label class="switch-item">
+              <span class="switch-texts">
+                <b>Grayscale</b>
+                <em>Converts colors to ink-saving print-optimized grayscale</em>
+              </span>
+              <input type="checkbox" id="opt-gray" class="switch-toggle" />
+            </label>
+
+            <label class="switch-item">
+              <span class="switch-texts">
+                <b>Black &amp; white (Adaptive threshold)</b>
+                <em>Sharp 2-tone monochrome laser print optimization</em>
+              </span>
+              <input type="checkbox" id="opt-bw" class="switch-toggle" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Layout & Sheet Geometry -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Layout &amp; Slides Per Page</h2>
+          </div>
+
+          <div class="field-label">Quick Presets:</div>
+          <div class="presets-grid" id="presets-grid"></div>
+
+          <!-- Custom Rows & Cols (Shown when custom is selected) -->
+          <div class="field-grid-2" id="custom-grid" hidden>
+            <div class="field-row">
+              <label class="field-label" for="opt-rows">Rows (1–8)</label>
+              <input type="number" id="opt-rows" class="field-input" min="1" max="8" value="3" />
+            </div>
+            <div class="field-row">
+              <label class="field-label" for="opt-cols">Columns (1–8)</label>
+              <input type="number" id="opt-cols" class="field-input" min="1" max="8" value="1" />
+            </div>
+          </div>
+
+          <div class="field-grid-2">
+            <div class="field-row">
+              <label class="field-label" for="opt-paper">Paper size</label>
+              <select id="opt-paper" class="field-select">
+                <option value="a4" selected>A4 (210 × 297 mm)</option>
+                <option value="a5">A5 (148 × 210 mm)</option>
+                <option value="a3">A3 (297 × 420 mm)</option>
+                <option value="letter">US Letter (8.5 × 11 in)</option>
+                <option value="legal">US Legal (8.5 × 14 in)</option>
+                <option value="original">Original Size</option>
+              </select>
+            </div>
+            <div class="field-row">
+              <label class="field-label" for="opt-orient">Orientation</label>
+              <select id="opt-orient" class="field-select">
+                <option value="portrait" selected>Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="switches-group" style="margin-top:14px;">
+            <label class="switch-item">
+              <span class="switch-texts">
+                <b>Booklet / Zine Imposition (Saddle-stitch)</b>
+                <em>Rearranges pages to fold in half as a physical booklet (print 2-sided)</em>
+              </span>
+              <input type="checkbox" id="opt-booklet" class="switch-toggle" />
+            </label>
+
+            <!-- Booklet Sub-options -->
+            <div id="booklet-options-group" class="switches-group sub-item" style="margin-top:8px;" hidden>
+              <div class="field-row" style="margin-top:8px;">
+                <label class="field-label" for="opt-booklet-nums">Half-page Numbering Style</label>
+                <select id="opt-booklet-nums" class="field-select">
+                  <option value="each" selected>Logical page number at bottom of each half-page</option>
+                  <option value="sheet">Bottom center of entire sheet</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+
+              <label class="switch-item" style="margin-top:8px;">
+                <span class="switch-texts">
+                  <b>Center fold/cut dashed guideline</b>
+                  <em>Prints a subtle guideline down the middle of the landscape sheet for folding</em>
+                </span>
+                <input type="checkbox" id="opt-booklet-line" class="switch-toggle" checked />
+              </label>
+
+              <div class="field-row" style="margin-top:8px;">
+                <label class="field-label" for="opt-booklet-creep">Spine Creep Gutter Shift (mm)</label>
+                <input type="number" id="opt-booklet-creep" class="field-input" min="0" max="10" step="0.5" value="0" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced Layout Tweaks -->
+          <details style="margin-top:16px;">
+            <summary style="cursor:pointer; font-size:13px; font-weight:600; color:var(--text-muted); outline:none;">
+              Margins, inter-slide spacing, separators &amp; page numbers
+            </summary>
+            <div class="field-grid-2" style="margin-top:12px;">
+              <div class="field-row">
+                <label class="field-label" for="opt-margin">Sheet Margin (mm)</label>
+                <input type="number" id="opt-margin" class="field-input" min="0" max="40" value="10" />
+              </div>
+              <div class="field-row">
+                <label class="field-label" for="opt-gap">Slide Spacing Gap (mm)</label>
+                <input type="number" id="opt-gap" class="field-input" min="0" max="50" value="4" />
+              </div>
+            </div>
+
+            <div class="field-row" style="margin-top:12px;">
+              <label class="field-label" for="opt-quality">Render Quality</label>
+              <select id="opt-quality" class="field-select">
+                <option value="low">Low (Fastest, compact file)</option>
+                <option value="medium" selected>Medium (Standard print balance)</option>
+                <option value="high">High (Maximum resolution &amp; crispness)</option>
+              </select>
+            </div>
+
+            <div class="switches-group" style="margin-top:14px;">
+              <label class="switch-item">
+                <span class="switch-texts">
+                  <b>Separator lines</b>
+                  <em>Draws fine cut / divider lines between slides</em>
+                </span>
+                <input type="checkbox" id="opt-sep" class="switch-toggle" />
+              </label>
+
+              <label class="switch-item">
+                <span class="switch-texts">
+                  <b>Page numbering</b>
+                  <em>Prints bottom-center sheet numbers</em>
+                </span>
+                <input type="checkbox" id="opt-num" class="switch-toggle" />
+              </label>
+
+              <div class="field-row" style="margin-top:8px;">
+                <label class="field-label" for="opt-num-start">Start numbering at</label>
+                <input type="number" id="opt-num-start" class="field-input" min="1" value="1" />
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <!-- Right Column: Sticky Live Preview & Export -->
+      <aside class="ws-column-side">
+        <div class="panel preview-card">
+          <div class="panel-head">
+            <h2 class="panel-title">Preview <small>first sheet</small></h2>
+            <span id="pipeline-badge" class="pipeline-badge badge-vector">Vector Mode</span>
+          </div>
+
+          <!-- Preview Canvas Box -->
+          <div class="preview-container">
+            <canvas id="preview-canvas" class="preview-canvas" hidden></canvas>
+            <p id="preview-empty" class="preview-empty">Add a PDF above to see a live sheet preview.</p>
+          </div>
+
+          <!-- Stats Line -->
+          <div id="stats-summary" class="preview-stats"></div>
+
+          <!-- Action Button -->
+          <button id="process-btn" type="button" class="btn btn-primary btn-block" disabled>
+            Create Print-Ready PDF
+          </button>
+
+          <!-- Sidebar Error Alert -->
+          <div id="preview-error-alert" class="alert-error" hidden style="margin-top:10px;"></div>
+
+          <!-- Processing Progress -->
+          <div id="progress-box" class="progress-box" hidden>
+            <div class="progress-track">
+              <div id="progress-bar" class="progress-fill"></div>
+            </div>
+            <div class="progress-info">
+              <span id="progress-text">Processing slides…</span>
+              <button id="cancel-btn" class="btn btn-ghost" type="button" style="padding:2px 8px; font-size:12px;">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Result Export Area -->
+          <div id="result-box" class="result-box" hidden>
+            <a id="download-link" class="btn btn-ink btn-block" download="notesheet.pdf">
+              Download PDF
+            </a>
+            <button id="share-btn" type="button" class="btn btn-ghost btn-block" hidden>
+              Share PDF
+            </button>
+            <p id="result-meta" class="result-meta"></p>
+          </div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>NoteSheet Base — 100% In-Browser PDF Processing Engine. Zero server upload, complete student privacy.</p>
+  </footer>
+
+</body>
+</html>
