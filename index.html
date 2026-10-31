@@ -183,6 +183,31 @@
               </span>
               <input type="checkbox" id="opt-booklet" class="switch-toggle" />
             </label>
+
+            <!-- Booklet Sub-options -->
+            <div id="booklet-options-group" class="switches-group sub-item" style="margin-top:8px;" hidden>
+              <div class="field-row" style="margin-top:8px;">
+                <label class="field-label" for="opt-booklet-nums">Half-page Numbering Style</label>
+                <select id="opt-booklet-nums" class="field-select">
+                  <option value="each" selected>Logical page number at bottom of each half-page</option>
+                  <option value="sheet">Bottom center of entire sheet</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+
+              <label class="switch-item" style="margin-top:8px;">
+                <span class="switch-texts">
+                  <b>Center fold/cut dashed guideline</b>
+                  <em>Prints a subtle guideline down the middle of the landscape sheet for folding</em>
+                </span>
+                <input type="checkbox" id="opt-booklet-line" class="switch-toggle" checked />
+              </label>
+
+              <div class="field-row" style="margin-top:8px;">
+                <label class="field-label" for="opt-booklet-creep">Spine Creep Gutter Shift (mm)</label>
+                <input type="number" id="opt-booklet-creep" class="field-input" min="0" max="10" step="0.5" value="0" />
+              </div>
+            </div>
           </div>
 
           <!-- Advanced Layout Tweaks -->

@@ -1,11 +1,12 @@
 /**
  * Booklet (Saddle-Stitch) Imposition Pipeline for Vector and Raster modes.
+ * Supports half-page numbering, center fold/cut dashed guidelines, and spine creep adjustments.
  */
 
 import { degrees, PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import { JPEG_QUALITY, RENDER_SCALE } from '../config';
+import { JPEG_QUALITY, MM_TO_PT, RENDER_SCALE } from '../config';
 import { filterImageData } from '../filters/worker-client';
-import { ProcessingProgress, Settings } from '../types';
+import { ProcessingProgress, Settings, SheetCell } from '../types';
 import { generateBookletSheets } from './booklet-math';
 import {
   calculateSheetGrid,
@@ -44,12 +45,40 @@ export async function processBooklet(
 
   const bookletSheets = generateBookletSheets(pageNumbers);
   const totalPhysicalPages = bookletSheets.length * 2;
-
   const effectiveRaster = isRaster && typeof document !== 'undefined';
+
+  const outDoc = await PDFDocument.create();
+  const font = await outDoc.embedFont(StandardFonts.Helvetica);
+
+  const drawHalfPageNumber = (page: any, pageNum: number, cell: SheetCell) => {
+    if (pageNum <= 0 || bookletSettings.bookletPageNumbers === 'none') return;
+    const label = String(pageNum);
+    const size = 9;
+    const textWidth = font.widthOfTextAtSize(label, size);
+    page.drawText(label, {
+      x: cell.x + (cell.w - textWidth) / 2,
+      y: cell.y + 6,
+      size,
+      font,
+      color: rgb(0.25, 0.25, 0.25),
+    });
+  };
+
+  const drawCenterGuideline = (page: any, sheetW: number, sheetH: number) => {
+    if (!bookletSettings.bookletCenterLine) return;
+    const dashColor = rgb(0.65, 0.65, 0.65);
+    const marginPt = marginMmToPt(bookletSettings.marginMm);
+    page.drawLine({
+      start: { x: sheetW / 2, y: marginPt },
+      end: { x: sheetW / 2, y: sheetH - marginPt },
+      thickness: 0.75,
+      color: dashColor,
+      dashArray: [4, 4],
+    });
+  };
 
   if (effectiveRaster) {
     const pdfDoc = await openPdfForRender(bytes);
-    const outDoc = await PDFDocument.create();
     const canvas = document.createElement('canvas');
     const scale = RENDER_SCALE[bookletSettings.quality] || 2;
     const isPng = bookletSettings.blackWhite;
@@ -61,11 +90,9 @@ export async function processBooklet(
     let grid: ReturnType<typeof calculateSheetGrid> | null = null;
     let renderedCount = 0;
 
-    // Cache rendered page images to avoid re-rendering
     const pageImageCache = new Map<number, any>();
 
     try {
-      // Collect unique non-zero page numbers to render
       const uniquePages = [...new Set(pageNumbers.filter((n) => n > 0))];
       for (const pNum of uniquePages) {
         if (signal?.aborted) throw new DOMException('Processing cancelled', 'AbortError');
@@ -91,7 +118,6 @@ export async function processBooklet(
         });
       }
 
-      // Create a blank white image for padding pages if needed
       canvas.width = 600;
       canvas.height = 848;
       const bCtx = canvas.getContext('2d')!;
@@ -101,7 +127,6 @@ export async function processBooklet(
       const blankImage = isPng ? await outDoc.embedPng(blankBytes) : await outDoc.embedJpg(blankBytes);
       const blankDim = { w: 595.28, h: 841.89 };
 
-      // Determine sheet size from first page or default A4 landscape
       const firstCached = pageImageCache.get(uniquePages[0]) || { w: 595.28, h: 841.89 };
       [sheetW, sheetH] = calculateSheetSize(bookletSettings, firstCached.w, firstCached.h);
       grid = calculateSheetGrid(
@@ -113,56 +138,53 @@ export async function processBooklet(
         gapMmToPt(bookletSettings.gapMm)
       );
 
-      let sideIndex = 0;
+      let sheetIndex = 0;
       for (const bs of bookletSheets) {
-        // Front side
-        if (signal?.aborted) throw new DOMException('Processing cancelled', 'AbortError');
-        const frontPage = outDoc.addPage([sheetW, sheetH]);
-        const leftF = bs.front.leftPageNum > 0 ? pageImageCache.get(bs.front.leftPageNum) : { image: blankImage, ...blankDim };
-        const rightF = bs.front.rightPageNum > 0 ? pageImageCache.get(bs.front.rightPageNum) : { image: blankImage, ...blankDim };
+        // Creep offset calculation for spine shift (mm to pt)
+        const creepPt = (sheetIndex * bookletSettings.bookletCreepMm * MM_TO_PT) / 2;
 
-        const fitL1 = fitInCell(grid.cells[0], leftF.w, leftF.h);
-        const fitR1 = fitInCell(grid.cells[1], rightF.w, rightF.h);
+        const renderSide = (pair: { leftPageNum: number; rightPageNum: number }) => {
+          if (signal?.aborted) throw new DOMException('Processing cancelled', 'AbortError');
+          const page = outDoc.addPage([sheetW, sheetH]);
+          const leftItem = pair.leftPageNum > 0 ? pageImageCache.get(pair.leftPageNum) : { image: blankImage, ...blankDim };
+          const rightItem = pair.rightPageNum > 0 ? pageImageCache.get(pair.rightPageNum) : { image: blankImage, ...blankDim };
 
-        frontPage.drawImage(leftF.image, { x: fitL1.x, y: fitL1.y, width: fitL1.w, height: fitL1.h });
-        frontPage.drawImage(rightF.image, { x: fitR1.x, y: fitR1.y, width: fitR1.w, height: fitR1.h });
+          const cellL: SheetCell = { ...grid!.cells[0], x: grid!.cells[0].x + creepPt };
+          const cellR: SheetCell = { ...grid!.cells[1], x: grid!.cells[1].x - creepPt };
 
-        if (bookletSettings.separators && grid.lines.length > 0) {
-          const sepColor = rgb(0.72, 0.72, 0.72);
-          for (const line of grid.lines) {
-            frontPage.drawLine({ start: { x: line.x1, y: line.y1 }, end: { x: line.x2, y: line.y2 }, thickness: 0.5, color: sepColor });
+          const fitL = fitInCell(cellL, leftItem.w, leftItem.h);
+          const fitR = fitInCell(cellR, rightItem.w, rightItem.h);
+
+          page.drawImage(leftItem.image, { x: fitL.x, y: fitL.y, width: fitL.w, height: fitL.h });
+          page.drawImage(rightItem.image, { x: fitR.x, y: fitR.y, width: fitR.w, height: fitR.h });
+
+          if (bookletSettings.bookletPageNumbers === 'each') {
+            drawHalfPageNumber(page, pair.leftPageNum, cellL);
+            drawHalfPageNumber(page, pair.rightPageNum, cellR);
           }
-        }
 
-        // Back side
-        if (signal?.aborted) throw new DOMException('Processing cancelled', 'AbortError');
-        const backPage = outDoc.addPage([sheetW, sheetH]);
-        const leftB = bs.back.leftPageNum > 0 ? pageImageCache.get(bs.back.leftPageNum) : { image: blankImage, ...blankDim };
-        const rightB = bs.back.rightPageNum > 0 ? pageImageCache.get(bs.back.rightPageNum) : { image: blankImage, ...blankDim };
+          drawCenterGuideline(page, sheetW, sheetH);
 
-        const fitL2 = fitInCell(grid.cells[0], leftB.w, leftB.h);
-        const fitR2 = fitInCell(grid.cells[1], rightB.w, rightB.h);
-
-        backPage.drawImage(leftB.image, { x: fitL2.x, y: fitL2.y, width: fitL2.w, height: fitL2.h });
-        backPage.drawImage(rightB.image, { x: fitR2.x, y: fitR2.y, width: fitR2.w, height: fitR2.h });
-
-        if (bookletSettings.separators && grid.lines.length > 0) {
-          const sepColor = rgb(0.72, 0.72, 0.72);
-          for (const line of grid.lines) {
-            backPage.drawLine({ start: { x: line.x1, y: line.y1 }, end: { x: line.x2, y: line.y2 }, thickness: 0.5, color: sepColor });
+          if (bookletSettings.separators && grid!.lines.length > 0) {
+            const sepColor = rgb(0.72, 0.72, 0.72);
+            for (const line of grid!.lines) {
+              page.drawLine({ start: { x: line.x1, y: line.y1 }, end: { x: line.x2, y: line.y2 }, thickness: 0.5, color: sepColor });
+            }
           }
-        }
+        };
 
-        sideIndex += 2;
+        renderSide(bs.front);
+        renderSide(bs.back);
+
+        sheetIndex++;
         onProgress?.({
-          fraction: 0.55 + (0.4 * sideIndex) / totalPhysicalPages,
-          message: `Assembling booklet sheet ${sideIndex / 2} of ${bookletSheets.length}`,
+          fraction: 0.55 + (0.4 * (sheetIndex * 2)) / totalPhysicalPages,
+          message: `Assembling booklet sheet ${sheetIndex} of ${bookletSheets.length}`,
           stage: 'arranging',
         });
       }
 
-      if (bookletSettings.pageNumbers) {
-        const font = await outDoc.embedFont(StandardFonts.Helvetica);
+      if (bookletSettings.pageNumbers && bookletSettings.bookletPageNumbers === 'sheet') {
         outDoc.getPages().forEach((p, i) => {
           const label = String(bookletSettings.pageNumberStart + i);
           const { width } = p.getSize();
@@ -184,8 +206,6 @@ export async function processBooklet(
   } else {
     // Vector booklet pipeline
     const srcDoc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
-    const outDoc = await PDFDocument.create();
-
     const srcPages = pageNumbers.map((n) => srcDoc.getPage(n - 1));
     const embedded = await outDoc.embedPages(
       srcPages,
@@ -211,18 +231,22 @@ export async function processBooklet(
       gapMmToPt(bookletSettings.gapMm)
     );
 
-    let sideIndex = 0;
+    let sheetIndex = 0;
     for (const bs of bookletSheets) {
       if (signal?.aborted) throw new DOMException('Processing cancelled', 'AbortError');
 
-      // Helper to draw a pair onto a sheet page
+      const creepPt = (sheetIndex * bookletSettings.bookletCreepMm * MM_TO_PT) / 2;
+
       const drawSidePair = (pair: { leftPageNum: number; rightPageNum: number }) => {
         const page = outDoc.addPage([sheetW, sheetH]);
-        const drawSingle = (pageNum: number, cellIdx: number) => {
-          if (pageNum <= 0) return; // blank padding page
+        const cellL: SheetCell = { ...grid.cells[0], x: grid.cells[0].x + creepPt };
+        const cellR: SheetCell = { ...grid.cells[1], x: grid.cells[1].x - creepPt };
+
+        const drawSingle = (pageNum: number, cell: SheetCell) => {
+          if (pageNum <= 0) return;
           const idx = pageNum - 1;
           const { w, h, rot } = displayed[idx];
-          const fit = fitInCell(grid.cells[cellIdx], w, h);
+          const fit = fitInCell(cell, w, h);
           const ew = embedded[idx].width * fit.scale;
           const eh = embedded[idx].height * fit.scale;
           let x = fit.x;
@@ -234,8 +258,15 @@ export async function processBooklet(
           page.drawPage(embedded[idx], { x, y, width: ew, height: eh, rotate: degrees(angle) });
         };
 
-        drawSingle(pair.leftPageNum, 0);
-        drawSingle(pair.rightPageNum, 1);
+        drawSingle(pair.leftPageNum, cellL);
+        drawSingle(pair.rightPageNum, cellR);
+
+        if (bookletSettings.bookletPageNumbers === 'each') {
+          drawHalfPageNumber(page, pair.leftPageNum, cellL);
+          drawHalfPageNumber(page, pair.rightPageNum, cellR);
+        }
+
+        drawCenterGuideline(page, sheetW, sheetH);
 
         if (bookletSettings.separators && grid.lines.length > 0) {
           const sepColor = rgb(0.72, 0.72, 0.72);
@@ -248,16 +279,15 @@ export async function processBooklet(
       drawSidePair(bs.front);
       drawSidePair(bs.back);
 
-      sideIndex += 2;
+      sheetIndex++;
       onProgress?.({
-        fraction: (sideIndex / totalPhysicalPages),
-        message: `Assembling booklet sheet ${sideIndex / 2} of ${bookletSheets.length}`,
+        fraction: (sheetIndex * 2) / totalPhysicalPages,
+        message: `Assembling booklet sheet ${sheetIndex} of ${bookletSheets.length}`,
         stage: 'arranging',
       });
     }
 
-    if (bookletSettings.pageNumbers) {
-      const font = await outDoc.embedFont(StandardFonts.Helvetica);
+    if (bookletSettings.pageNumbers && bookletSettings.bookletPageNumbers === 'sheet') {
       outDoc.getPages().forEach((p, i) => {
         const label = String(bookletSettings.pageNumberStart + i);
         const { width } = p.getSize();

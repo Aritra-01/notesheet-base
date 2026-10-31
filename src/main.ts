@@ -94,6 +94,10 @@ document.addEventListener('DOMContentLoaded', () => {
     numSwitch: $<HTMLInputElement>('opt-num'),
     numStartInput: $<HTMLInputElement>('opt-num-start'),
     bookletSwitch: $<HTMLInputElement>('opt-booklet'),
+    bookletNumsSelect: $<HTMLSelectElement>('opt-booklet-nums'),
+    bookletLineSwitch: $<HTMLInputElement>('opt-booklet-line'),
+    bookletCreepInput: $<HTMLInputElement>('opt-booklet-creep'),
+    bookletOptionsGroup: $('booklet-options-group'),
   });
 
   let currentAbortController: AbortController | null = null;

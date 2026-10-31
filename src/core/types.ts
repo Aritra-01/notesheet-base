@@ -27,6 +27,9 @@ export interface Settings {
   marginMm: number;
   gapMm: number;
   booklet: boolean;
+  bookletPageNumbers: 'each' | 'sheet' | 'none';
+  bookletCenterLine: boolean;
+  bookletCreepMm: number;
 
   // Enhancements
   quality: QualityPreset;

@@ -26,6 +26,10 @@ export function initControls(elements: {
   numSwitch: HTMLInputElement;
   numStartInput: HTMLInputElement;
   bookletSwitch: HTMLInputElement;
+  bookletNumsSelect: HTMLSelectElement;
+  bookletLineSwitch: HTMLInputElement;
+  bookletCreepInput: HTMLInputElement;
+  bookletOptionsGroup: HTMLElement;
 }): void {
   const {
     presetsContainer,
@@ -47,6 +51,10 @@ export function initControls(elements: {
     numSwitch,
     numStartInput,
     bookletSwitch,
+    bookletNumsSelect,
+    bookletLineSwitch,
+    bookletCreepInput,
+    bookletOptionsGroup,
   } = elements;
 
   // Build Preset Layout buttons
@@ -185,6 +193,19 @@ export function initControls(elements: {
     store.saveSettings({ booklet: bookletSwitch.checked });
   });
 
+  bookletNumsSelect.addEventListener('change', () => {
+    store.saveSettings({ bookletPageNumbers: bookletNumsSelect.value as any });
+  });
+
+  bookletLineSwitch.addEventListener('change', () => {
+    store.saveSettings({ bookletCenterLine: bookletLineSwitch.checked });
+  });
+
+  bookletCreepInput.addEventListener('input', () => {
+    const val = Math.max(0, parseFloat(bookletCreepInput.value) || 0);
+    store.saveSettings({ bookletCreepMm: val });
+  });
+
   // Keep controls synchronized with store state
   store.subscribe((state) => {
     const s = state.settings;
@@ -207,6 +228,10 @@ export function initControls(elements: {
     numSwitch.checked = s.pageNumbers;
     numStartInput.value = String(s.pageNumberStart);
     bookletSwitch.checked = s.booklet;
+    bookletNumsSelect.value = s.bookletPageNumbers;
+    bookletLineSwitch.checked = s.bookletCenterLine;
+    bookletCreepInput.value = String(s.bookletCreepMm);
+    bookletOptionsGroup.hidden = !s.booklet;
 
     // Disable dependent controls appropriately
     whiteSwitch.closest('.switch-item')?.classList.toggle('disabled', !s.invert);
