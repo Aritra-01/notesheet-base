@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sepSwitch: $<HTMLInputElement>('opt-sep'),
     numSwitch: $<HTMLInputElement>('opt-num'),
     numStartInput: $<HTMLInputElement>('opt-num-start'),
+    bookletSwitch: $<HTMLInputElement>('opt-booklet'),
   });
 
   let currentAbortController: AbortController | null = null;

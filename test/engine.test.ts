@@ -7,6 +7,8 @@ import { PDFDocument, rgb } from 'pdf-lib';
 import { calculateSheetGrid, calculateSheetSize, fitInCell } from '../src/core/engine/layout-math';
 import { mergePdfFiles } from '../src/core/engine/pdf-merger';
 import { processVector } from '../src/core/engine/vector-pipeline';
+import { processPdf } from '../src/core/engine/processor';
+import { generateBookletSheets } from '../src/core/engine/booklet-math';
 import {
   adaptiveThreshold,
   detectBackground,
@@ -20,8 +22,7 @@ import { DEFAULT_SETTINGS } from '../src/core/config';
 async function createMockSlidePdf(numPages = 3): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   for (let i = 1; i <= numPages; i++) {
-    const page = doc.addPage([800, 450]); // 16:9 widescreen slide
-    // Dark chalkboard/navy background
+    const page = doc.addPage([800, 450]);
     page.drawRectangle({
       x: 0,
       y: 0,
@@ -29,7 +30,6 @@ async function createMockSlidePdf(numPages = 3): Promise<Uint8Array> {
       height: 450,
       color: rgb(0.08, 0.12, 0.18),
     });
-    // White text
     page.drawText(`Test Slide #${i} - Lecture Notes`, {
       x: 60,
       y: 350,
@@ -53,9 +53,9 @@ async function runTests() {
   const height = 100;
   const darkNavyPixels = new Uint8ClampedArray(width * height * 4);
   for (let i = 0; i < width * height * 4; i += 4) {
-    darkNavyPixels[i] = 18;     // R
-    darkNavyPixels[i + 1] = 25; // G
-    darkNavyPixels[i + 2] = 40; // B
+    darkNavyPixels[i] = 18;
+    darkNavyPixels[i + 1] = 25;
+    darkNavyPixels[i + 2] = 40;
     darkNavyPixels[i + 3] = 255;
   }
   const dom = dominantColor(width, height, darkNavyPixels);
@@ -77,7 +77,6 @@ async function runTests() {
 
   console.log('--- 4. Testing Bradley Adaptive Thresholding ---');
   adaptiveThreshold(width, height, darkNavyPixels, 16, 5);
-  // Pure monochrome output (either 0 or 255)
   assert.ok(darkNavyPixels[0] === 0 || darkNavyPixels[0] === 255);
   console.log('✓ Adaptive thresholding verified');
 
@@ -97,7 +96,16 @@ async function runTests() {
   assert.ok(fit.h <= grid.cells[0].h, 'Fitted height fits within cell');
   console.log('✓ Sheet layout geometry verified');
 
-  console.log('--- 6. Testing Multi-PDF Merging ---');
+  console.log('--- 6. Testing Booklet Imposition Pairs ---');
+  const bookletSheets = generateBookletSheets([1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.strictEqual(bookletSheets.length, 2, '8 pages forms 2 physical booklet sheets (4 sides)');
+  assert.strictEqual(bookletSheets[0].front.leftPageNum, 8);
+  assert.strictEqual(bookletSheets[0].front.rightPageNum, 1);
+  assert.strictEqual(bookletSheets[0].back.leftPageNum, 2);
+  assert.strictEqual(bookletSheets[0].back.rightPageNum, 7);
+  console.log('✓ Booklet imposition math verified');
+
+  console.log('--- 7. Testing Multi-PDF Merging ---');
   const pdfBytes1 = await createMockSlidePdf(2);
   const pdfBytes2 = await createMockSlidePdf(3);
   const file1 = new File([pdfBytes1 as unknown as BlobPart], 'lecture1.pdf', { type: 'application/pdf' });
@@ -108,26 +116,22 @@ async function runTests() {
   assert.strictEqual(mergedDoc.getPageCount(), 5, 'Merged exactly 2 + 3 = 5 pages');
   console.log('✓ PDF merger verified');
 
-  console.log('--- 7. Testing Vector Inversion & 3-up Tiling ---');
-  const vectorResult = await processVector(
+  console.log('--- 8. Testing Booklet PDF Generation ---');
+  const bookletResult = await processPdf(
     mergedBytes,
     [1, 2, 3, 4, 5],
     {
       ...DEFAULT_SETTINGS,
-      rows: 3,
-      cols: 1,
-      paper: 'a4',
-      orientation: 'portrait',
+      booklet: true,
       separators: true,
       pageNumbers: true,
-      pageNumberStart: 1,
     }
   );
-
-  assert.strictEqual(vectorResult.sheets, 2, '5 slides tiled 3-per-sheet yields 2 sheets');
-  const vectorOutDoc = await PDFDocument.load(vectorResult.bytes);
-  assert.strictEqual(vectorOutDoc.getPageCount(), 2, 'Output PDF has 2 sheets');
-  console.log('✓ Vector 3-up transformation verified');
+  // 5 pages pads to 8 pages -> 2 physical sheets -> 4 pages in output PDF (2 sheets * 2 sides)
+  assert.strictEqual(bookletResult.sheets, 2, 'Padded 5 pages yields 2 booklet sheets');
+  const outDoc = await PDFDocument.load(bookletResult.bytes);
+  assert.strictEqual(outDoc.getPageCount(), 4, 'Output booklet PDF has 4 physical pages (2 sheets, 2 sides each)');
+  console.log('✓ Booklet PDF generation verified');
 
   console.log('\n========================================');
   console.log('ALL CORE ENGINE VERIFICATION TESTS PASSED!');

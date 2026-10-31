@@ -26,6 +26,7 @@ export interface Settings {
   orientation: Orientation;
   marginMm: number;
   gapMm: number;
+  booklet: boolean;
 
   // Enhancements
   quality: QualityPreset;

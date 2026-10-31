@@ -25,6 +25,7 @@ export function initControls(elements: {
   sepSwitch: HTMLInputElement;
   numSwitch: HTMLInputElement;
   numStartInput: HTMLInputElement;
+  bookletSwitch: HTMLInputElement;
 }): void {
   const {
     presetsContainer,
@@ -45,6 +46,7 @@ export function initControls(elements: {
     sepSwitch,
     numSwitch,
     numStartInput,
+    bookletSwitch,
   } = elements;
 
   // Build Preset Layout buttons
@@ -179,6 +181,10 @@ export function initControls(elements: {
     store.saveSettings({ pageNumberStart: val });
   });
 
+  bookletSwitch.addEventListener('change', () => {
+    store.saveSettings({ booklet: bookletSwitch.checked });
+  });
+
   // Keep controls synchronized with store state
   store.subscribe((state) => {
     const s = state.settings;
@@ -200,6 +206,7 @@ export function initControls(elements: {
     sepSwitch.checked = s.separators;
     numSwitch.checked = s.pageNumbers;
     numStartInput.value = String(s.pageNumberStart);
+    bookletSwitch.checked = s.booklet;
 
     // Disable dependent controls appropriately
     whiteSwitch.closest('.switch-item')?.classList.toggle('disabled', !s.invert);

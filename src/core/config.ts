@@ -37,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   orientation: 'portrait',
   marginMm: 10,
   gapMm: 4,
+  booklet: false,
   quality: 'medium',
   separators: false,
   pageNumbers: false,

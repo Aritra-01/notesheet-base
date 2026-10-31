@@ -5,6 +5,7 @@
 
 import { filterPipeline } from '../filters/filter-pipeline';
 import { PipelineType, ProcessingProgress, ProcessResult, Settings } from '../types';
+import { processBooklet } from './booklet-pipeline';
 import { processRaster } from './raster-pipeline';
 import { processVector } from './vector-pipeline';
 
@@ -50,7 +51,9 @@ export async function processPdf(
 
   const startTime = performance.now();
 
-  const { bytes: outputBytes, sheets } = isRaster
+  const { bytes: outputBytes, sheets } = settings.booklet
+    ? await processBooklet(bytes, pageNumbers, settings, isRaster, onProgress, signal)
+    : isRaster
     ? await processRaster(bytes, pageNumbers, settings, onProgress, signal)
     : await processVector(bytes, pageNumbers, settings, onProgress, signal);
 
