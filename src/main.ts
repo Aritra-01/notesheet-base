@@ -126,14 +126,6 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       store.setResult(result);
-
-      // Auto-trigger direct download to save user an extra click!
-      setTimeout(() => {
-        const dlLink = $<HTMLAnchorElement>('download-link');
-        if (dlLink && dlLink.href) {
-          dlLink.click();
-        }
-      }, 100);
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         console.error('Processing failed:', err);
