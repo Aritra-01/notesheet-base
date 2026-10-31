@@ -64,7 +64,9 @@ export function initPreviewCard(elements: {
     const { pdfDoc, totalPageCount, selectedPages, settings, isProcessing } = state;
     const selectedCount = selectedPages.size;
     const perSheet = settings.rows * settings.cols;
-    const sheetsNeeded = Math.ceil(selectedCount / perSheet);
+    const sheetsNeeded = settings.booklet
+      ? Math.ceil(selectedCount / 4)
+      : Math.ceil(selectedCount / perSheet);
 
     // Update Process Button status
     processBtn.disabled = !pdfDoc || selectedCount === 0 || isProcessing;
