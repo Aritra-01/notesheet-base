@@ -97,6 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentAbortController: AbortController | null = null;
 
+  let isFirstLoad = true;
+
   // Process PDF Trigger Handler
   const handleProcessPdf = async () => {
     const { mergedBytes, selectedPages, settings } = store.getState();
@@ -108,6 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const abort = new AbortController();
     currentAbortController = abort;
     store.setProcessing(true, { fraction: 0, message: 'Starting PDF engine…' });
+    const processBtn = $<HTMLButtonElement>('process-btn');
+    processBtn.disabled = true;
+    processBtn.textContent = 'Creating PDF…';
 
     try {
       const result = await processPdf(
@@ -121,6 +126,14 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       store.setResult(result);
+
+      // Auto-trigger direct download to save user an extra click!
+      setTimeout(() => {
+        const dlLink = $<HTMLAnchorElement>('download-link');
+        if (dlLink && dlLink.href) {
+          dlLink.click();
+        }
+      }, 100);
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         console.error('Processing failed:', err);
@@ -129,6 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       currentAbortController = null;
       store.setProcessing(false, null);
+      processBtn.textContent = 'Create Print-Ready PDF';
     }
   };
 
@@ -158,18 +172,36 @@ document.addEventListener('DOMContentLoaded', () => {
   // Global State Subscriptions for Layout and Alerts
   const panelPages = $('panel-pages');
   const errorAlert = $('error-alert');
+  const previewErrorAlert = $('preview-error-alert');
   const busyAlert = $('busy-alert');
 
   store.subscribe((state) => {
     // Show/hide page thumbnails card
     panelPages.hidden = state.totalPageCount === 0;
 
-    // Error alert
+    // Smooth scroll to workspace on first document load
+    if (state.totalPageCount > 0 && isFirstLoad) {
+      isFirstLoad = false;
+      setTimeout(() => {
+        $('workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    } else if (state.totalPageCount === 0) {
+      isFirstLoad = true;
+    }
+
+    // Error alerts (both in hero and sidebar)
     if (state.error) {
       errorAlert.textContent = state.error;
       errorAlert.hidden = false;
+      if (previewErrorAlert) {
+        previewErrorAlert.textContent = state.error;
+        previewErrorAlert.hidden = false;
+      }
     } else {
       errorAlert.hidden = true;
+      if (previewErrorAlert) {
+        previewErrorAlert.hidden = true;
+      }
     }
 
     // Busy message

@@ -130,13 +130,13 @@ export async function processRaster(
         });
 
         if (settings.separators && grid.lines.length > 0) {
-          const rgbColor = { red: 0.72, green: 0.72, blue: 0.72 };
+          const sepColor = rgb(0.72, 0.72, 0.72);
           for (const line of grid.lines) {
             page.drawLine({
               start: { x: line.x1, y: line.y1 },
               end: { x: line.x2, y: line.y2 },
               thickness: 0.5,
-              color: rgbColor as any,
+              color: sepColor,
             });
           }
         }
